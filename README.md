@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/hero.svg" alt="BilibiliLiveDelay：让解说，跟上画面。项目界面示意。" width="100%">
+<img src="docs/assets/hero.svg" alt="BilibiliLiveDelay：让解说，跟上画面。纯矢量控制面板示意，支持 0～60 秒音频或音画延迟。" width="100%">
 
 # BilibiliLiveDelay
 
@@ -13,6 +13,8 @@
 [![Chrome](https://img.shields.io/badge/Chrome-116%2B-f0b429)](#quick-start)
 [![Manifest](https://img.shields.io/badge/Manifest-V3-6b5bd2)](manifest.json)
 [![License](https://img.shields.io/badge/license-MIT-27a46a)](LICENSE)
+
+**[下载最新版本 →](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest)** · [所有 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases)
 
 [快速安装](#quick-start) · [功能](#features) · [工作原理](#how-it-works) · [测试记录](TESTING.md) · [反馈问题](https://github.com/Aurxs/BilibiliLiveDelay/issues)
 
@@ -28,9 +30,9 @@
 
 **BilibiliLiveDelay 把更快的那一路延后。** 默认延迟 30 秒，从插件按钮随时微调，让解说与比赛画面对齐。
 
-它通过 Chrome 官方标签页捕获 API 获取浏览器输出，在扩展内部完成缓冲与播放。直播网页继续按自己的逻辑拉流和播放，插件不控制 B 站播放器，也不解析直播地址。
+它通过 Chrome 标签页捕获 API 获取浏览器输出，在本机完成缓冲与延迟播放。
 
-> 当前版本：**1.3.0**。已在 macOS + Chrome 的 B 站真实直播中做短时验证。完整 1～3 小时观看、最终裁剪链路的端到端音画同步仍待验证，详见 [测试记录](TESTING.md)。
+当前版本：**[1.3.0](https://github.com/Aurxs/BilibiliLiveDelay/releases/tag/v1.3.0)**。
 
 <a id="features"></a>
 
@@ -53,24 +55,26 @@
 
 ## 快速安装
 
-### 1. 下载代码
+### 1. 下载扩展
+
+打开 **[最新 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest)**，下载附件中的 **`BilibiliLiveDelay-v版本号.zip`** 并解压。ZIP 里直接包含可加载的扩展文件，无需构建。
+
+Release 同时提供签名 **CRX3** 包和 **`SHA256SUMS`** 校验文件。Chrome 用户使用 ZIP 即可；CRX 供支持侧载的浏览器使用。
+
+开发者也可以克隆仓库：
 
 ```bash
 git clone https://github.com/Aurxs/BilibiliLiveDelay.git
 ```
 
-也可以在仓库右上方选择 **Code → Download ZIP**，下载后解压。
-
 ### 2. 加载到 Chrome
 
 1. 使用 **Chrome 116+**，打开 `chrome://extensions`。
 2. 开启右上角的「开发者模式」。
-3. 点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的 **BilibiliLiveDelay 项目文件夹**。
+3. 点击「加载已解压的扩展程序」，选择解压后包含 `manifest.json` 的 **扩展文件夹**。
 4. 在工具栏扩展菜单中固定 **Live Audio Sync · 直播音画延迟**。
 
 完成。安装无需 Node.js，也无需启动服务器。
-
-> 仓库名是 **BilibiliLiveDelay**；Chrome 中的扩展名称仍为 **Live Audio Sync**。目前通过开发者模式安装，尚未发布到 Chrome 应用商店。Chrome 116 是基础 API 的最低版本；音画模式还需要浏览器支持相应的捕获、编码与播放能力。
 
 ## 使用：F1 双流同步
 
@@ -87,7 +91,7 @@ Chrome：B 站中文解说 → 缓冲 30 秒 ────→ 你听到的解说
 4. 听到延迟后的解说时，用 `−0.5s` / `+0.5s` 微调，与 Safari 画面对齐。
 5. 点击「停止延迟」释放采集、丢弃剩余缓冲，恢复网页当前时刻的声音。
 
-纯音频模式不会捕获视频。Chrome 原标签页的视频继续播放，Safari 与其他未选择的标签页不在采集范围内。
+纯音频模式只处理当前选择的 Chrome 标签页音频。
 
 ### 声音与画面一起延迟
 
@@ -108,7 +112,7 @@ Chrome：B 站中文解说 → 缓冲 30 秒 ────→ 你听到的解说
 
 自动模式要求播放器完整显示在网页视口内。手动模式先点击「框选当前网页的视频区域」，在本地截图预览中拖出矩形并保存，再回到源网页开始；滚动源网页或改变窗口尺寸后需要重新框选。
 
-**区域模式先捕获所选标签页，再裁剪视频帧并编码选中区域。** 不是直接下载直播源。播放器区域里的弹幕、控制条和遮挡也会出现在输出中。
+区域模式捕获并裁剪浏览器实际显示的画面，选区中的弹幕和控件也会保留。
 
 ### 延迟调节会发生什么？
 
@@ -119,7 +123,7 @@ Chrome：B 站中文解说 → 缓冲 30 秒 ────→ 你听到的解说
 | 拖动滑块 | 拖动时预览，松手后应用 |
 | 停止后重启 | 丢弃旧缓冲，重新等待所选延迟 |
 
-调节不使用加速追赶，因此不会通过可听见的变速造成升降调；短暂停顿、纯音频淡入淡出与内容跳过仍会发生。
+调节时保持正常音调，通过暂停、淡入淡出或跳过缓冲完成切换。
 
 ## 画质与资源占用
 
@@ -130,14 +134,9 @@ Chrome：B 站中文解说 → 缓冲 30 秒 ────→ 你听到的解说
 | 1080p / 30fps | 8 Mbps |
 | 1080p / 60fps | 10 Mbps |
 
-音频目标码率为 128 kbps。视频使用可变码率，**实际数据量可能高于请求目标**，请查看面板的「数据平均」。
+音频目标码率为 128 kbps，视频使用可变码率。输出保持选区宽高比，小尺寸选区保留原始尺寸；面板可查看实际输出尺寸、播放帧率和平均码率。
 
-- **1080p 是输出像素尺寸。** 画面经过浏览器渲染、裁剪与有损重编码，清晰度受直播源、播放器显示尺寸、Chrome 采样与设备影响。
-- 初始区域像素不足时，不把小画面放大来冒充 HD；输出保持区域宽高比，尺寸可能小于档位标称值。
-- **60fps 是目标档位。** 实际播放帧率单独统计；源直播的独立帧数、后台行为与设备性能都会影响结果。
-- 高分辨率、高帧率与长延迟会增加 CPU/GPU、内存和耗电。遇到浏览器缓存内存上限时，扩展安全停止并提示降低画质或缩短延迟。
-
-优先从默认档位开始，再按设备和源直播情况提高画质。30 秒音画模式会清理旧数据，通常保留约 37 秒及分块/关键帧余量；更详细的缓存策略见 [架构说明](docs/ARCHITECTURE.md)。
+建议从默认档位开始，再按直播源和设备性能提高画质。高画质与长延迟会增加资源占用，缓存不足时可降低画质或缩短延迟。缓存策略见 [架构说明](docs/ARCHITECTURE.md)。
 
 <a id="how-it-works"></a>
 
@@ -178,7 +177,7 @@ Offscreen Document 承担采集和处理，控制面板关闭、Service Worker �
 <details>
 <summary><strong>会不会让 B 站反复切线路、转圈？</strong></summary>
 
-扩展不会暂停源视频、重新加载播放器或修改直播请求。已完成的短时真实直播观察中，没有发现上述行为。浏览器采集也会占用资源，无法保证所有直播间与设备组合都兼容；出现异常时，先停止扩展对比源网页状态。
+扩展通过 Chrome 捕获标签页输出，保持源播放器正常播放。遇到卡顿时，可先停止扩展对比，再降低画质或缩短延迟。
 
 </details>
 
@@ -192,7 +191,7 @@ Offscreen Document 承担采集和处理，控制面板关闭、Service Worker �
 <details>
 <summary><strong>1080p 为什么可能比源网页模糊？</strong></summary>
 
-本工具捕获浏览器呈现的画面，再进行有损编码。源直播可能是 2K，播放器区域的实际采样也可能不足 1080p。面板会分别显示可读的源尺寸、区域采样、实际输出尺寸和播放帧率，避免把档位名称当作实测结果。
+输出来自浏览器画面的裁剪和重编码。扩大源播放器显示区域、提高直播源清晰度，有助于改善输出效果；面板可查看源尺寸、区域采样和实际输出尺寸。
 
 </details>
 
@@ -213,13 +212,13 @@ Chrome 为媒体缓存设置的内存上限，与账号额度或流量无关。�
 <details>
 <summary><strong>0 秒、0.1 秒精度与长期稳定性怎么理解？</strong></summary>
 
-0.1 秒是设置步进，目标值与缓冲位置差均不是端到端测量。音画模式预留 0.75 秒播放缓冲，0 秒设置也有基础延迟；采集、编码、系统与蓝牙设备还会增加开销。系统休眠、Chrome 退出、页面丢弃会影响采集。1～3 小时耐久、设备切换与最终裁剪链路的同步仍待验证。
+延迟按 0.1 秒步进调整。音画模式另外预留 0.75 秒播放缓冲，采集、编码和输出设备也会带来基础延迟。观看期间请保持 Chrome 运行并避免系统休眠；测量与耐久记录见 [TESTING.md](TESTING.md)。
 
 </details>
 
 ## 验证与开发
 
-已完成相关回归检查、音频信号测量及 B 站真实直播短时测试。**各版本的测试结果分别记录，旧链路的测量不代表新链路已验证。** 详细步骤、实际数据与未验证项见 [TESTING.md](TESTING.md)。
+回归检查、音频信号测量及 B 站实播记录见 [TESTING.md](TESTING.md)。
 
 最终 1.3 裁剪链路的静音实播观察：
 
@@ -230,8 +229,6 @@ Chrome 为媒体缓存设置的内存上限，与账号额度或流量无关。�
 | 默认 30 秒下缓存范围 | 约 36.3～36.6 秒 |
 | 手动框选 | 保存、启动、选中区域播放与停止流程通过 |
 
-以上尺寸、帧率与缓存统计**不是实际延迟测量或整场稳定性保证**。
-
 维护者可使用 Node.js 18+ 执行本地检查，无需安装依赖：
 
 ```bash
@@ -241,6 +238,22 @@ npm test
 ```
 
 项目提供 `test/audio-test.html` 与 `test/av-test.html`，分别生成周期性编号短音，以及同钟时间码画面与短音，便于记录目标延迟和实际输出延迟。测试 file URL 时需在扩展详情开启「允许访问文件网址」，B 站使用无需开启。
+
+### 打包与发布
+
+GitHub Actions 在推送 `main` 或手动运行 **Package extension** 时生成 CRX、ZIP 与 SHA-256 校验文件，可在 Actions 的 Artifacts 中下载。推送 **`v版本号` 标签**时，会在打包成功后自动发布带附件的 [GitHub Release](https://github.com/Aurxs/BilibiliLiveDelay/releases)。标签、`manifest.json` 和 `package.json` 的版本必须一致。
+
+维护者需在仓库 Actions Secrets 中配置 **`CRX_PRIVATE_KEY`**，值为 RSA 私钥的完整 PEM 内容。所有版本复用同一把密钥，CRX 和 ZIP 的扩展 ID 因此保持一致；缺失密钥时打包会直接失败。私钥仅用于签名，不会进入安装包或 Git。
+
+本地打包需要 Node.js 18+ 和 Google Chrome：
+
+```bash
+npm run package -- --key /path/to/private-key.pem
+```
+
+默认使用 macOS 的标准 Chrome 路径，Linux 使用 `google-chrome`；其他安装位置可通过 `CHROME_PATH` 指定可执行文件。产物在 `dist/`，仅包含根目录的扩展 JS、HTML、CSS、清单及许可证，不包含测试、文档或开发配置。需要新增子目录资源时，应同步更新打包脚本。
+
+发布下一版本时，先同步两个版本文件、提交并推送，再创建与版本一致的标签，例如 `git tag v1.3.1` 后 `git push origin v1.3.1`。可在 `docs/releases/v版本号.md` 提供该版本发布说明；未提供时由 GitHub 自动生成。
 
 ```text
 BilibiliLiveDelay/
@@ -260,7 +273,7 @@ BilibiliLiveDelay/
 
 ## 参与贡献
 
-欢迎 [提交 Issue](https://github.com/Aurxs/BilibiliLiveDelay/issues) 或 Pull Request。报告问题时请附上 Chrome 版本、操作系统、模式/画质/目标延迟、面板错误，以及停止扩展后的源网页表现；不要提交账号凭据、Cookie 或私人直播画面。
+欢迎 [提交 Issue](https://github.com/Aurxs/BilibiliLiveDelay/issues) 或 Pull Request。报告问题时请附上 Chrome 版本、操作系统、模式、画质、目标延迟及面板错误。
 
 改动请保持播放器定位只读，不引入源播放器控制或直播请求拦截，并只验证相关行为。
 
@@ -269,5 +282,3 @@ BilibiliLiveDelay/
 ## License
 
 [MIT](LICENSE) © Aurxs。欢迎使用、修改与贡献。
-
-本项目是独立社区工具，与哔哩哔哩、Formula 1 及浏览器厂商无隶属关系。
