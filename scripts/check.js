@@ -12,7 +12,7 @@ if (manifest.manifest_version !== 3 || manifest.action.default_popup !== "contro
 for (const permission of manifest.permissions) {
   if (!["activeTab", "tabCapture", "offscreen", "storage", "scripting"].includes(permission)) throw new Error(`Unexpected permission: ${permission}`);
 }
-for (const name of [manifest.background.service_worker, "offscreen.html", "control.html", "control.js", "control.css", "viewer.html", "viewer.js", "av-engine.js", "av-playback.js", "crop.html", "crop.js", "video-cropper.js", "player-locator.js"]) {
+for (const name of [manifest.background.service_worker, "offscreen.html", "control.html", "control.js", "control.css", "viewer.html", "viewer.js", "av-engine.js", "av-playback.js", "crop.html", "crop.js", "av-encoder.js", "aac-priming.js", "fragmented-mp4.js", "player-locator.js"]) {
   if (!fs.existsSync(path.join(root, name))) throw new Error(`Missing file: ${name}`);
 }
 const source = files.map(name => fs.readFileSync(path.join(root, name), "utf8")).join("\n");

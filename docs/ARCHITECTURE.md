@@ -4,9 +4,13 @@
 
 ## 音画采集、裁剪与编码
 
-音画链路：Offscreen `getUserMedia(audio + video)` → 视频轨按需通过 `MediaStreamTrackProcessor → VideoFrame 裁剪 → 扩展自己的 canvas 实际缩放 → captureStream(所选帧率)`；音频通过 Web Audio 规范为 48 kHz（只连接 MediaStreamDestination）→ 单个 `MediaRecorder`（分片 MP4，H.264 / AAC）→ 扩展同源 BroadcastChannel → 播放页 `MediaSource/SourceBuffer` → 一个 `<video>` 输出音画。不另外连接音频 DelayNode，避免双份声音及两个时钟漂移。裁剪由输入帧驱动，不依赖后台页面的 requestAnimationFrame 或定时绘图，不通过 JS 读取完整像素数组；输入处理队列最多一帧，及时释放 VideoFrame。使用扩展自己的画布真正缩放编码帧，避免把仅设置 displayWidth/displayHeight 当作实际像素缩放；硬件加速由 Chrome 决定。画布轨道声明所选帧率，并由每个捕获帧触发 requestFrame；不操作网站的视频元素。画布输出使用采集时刻的时间戳，裁剪和缩放可能给画面增加少量处理延迟，最终音画偏移需信号测量，不能仅凭输出帧率推断同步。部分 Mac 的捕获音轨为 96 kHz；编码前用原生音频线程规范为 AAC 编码器支持的 48 kHz。音画模式使用 MP4/H.264/AAC，不在失败时自动切回已出现同步问题的 WebM/Opus 链路。此音频处理不输出到扬声器，暂停时最多恢复 3 次，失败安全停止。编码分块连续追加，不逐块换 src，保持媒体时间戳和初始化数据。样本与视频不经过 Service Worker；Worker 休眠不承担播放任务。
+Offscreen 获取标签页的音频轨和视频轨，在本地用 WebCodecs 编码为 AAC-LC 和 H.264 Baseline。视频处理器读取原始捕获帧，每帧按当前播放器坐标创建裁剪视图，编码器负责缩放到固定输出尺寸。整个标签页模式使用完整帧。轨道、帧和音频数据均由 Offscreen 管理。
 
-音画模式需要 Chrome 同时支持 MP4/H.264/AAC 录制和 MediaSource 播放，启动时检查能力；本机 Chrome 154 支持，较旧浏览器可能只能使用纯音频模式。Chrome 116 是基础扩展 API 最低版本，并不保证所有编码器可用。
+44100 Hz 和 48000 Hz 的单声道或立体声直接送入 AAC 编码器。其他采样率或声道布局通过 Web Audio 转为 48000 Hz 立体声。每个 AAC 包精确推进 1024 个采样。启动时在内存中编码、解码一个已知位置的脉冲，测量当前设备编码链路的前置采样，将同样的偏移应用于视频时间轴。视频时间取自捕获帧，两个处理器的起点通过文档单调时钟对齐。每个音频输入块都更新采集经过时间与实际采样数的差值，视频时间和播放页的直播时钟使用这一差值跟随音频。
+
+封装器先发送含两个轨道描述的初始化段，随后在两条轨道都有足够数据时生成约四分之一秒的 `moof` 和 `mdat`。每轨的 `tfdt` 使用 64 位解码时间，`trun` 数据偏移以本片 `moof` 为基准。整场累计字节数只用于面板平均码率。分片通过同源 BroadcastChannel 发送到一个播放页，MediaSource 将它们追加到同一时间轴。Service Worker 不转发媒体数据。
+
+运行环境需要支持轨道读取、WebCodecs H.264 编码、AAC 编解码和 MediaSource 的 MP4 播放。Chrome 116 是基础扩展 API 的最低版本，实际媒体能力由启动检查确定。
 
 采集范围可以选择：
 
@@ -23,13 +27,13 @@
 | 1080p / 30fps | 8 Mbps |
 | 1080p / 60fps | 10 Mbps |
 
-这些是编码器请求的目标值，并非实际速率或硬上限。当前 Chromium 的 MediaRecorder 使用可变码率，视频峰值预算可达目标的两倍；本机高动态直播请求 10 Mbps 时，实际数据平均可接近 20 Mbps。以面板按字节数统计的「数据平均」为准。音频目标码率为 128 kbps。1080p/60fps 使用 H.264 Level 4.2；各档位启动前检查录制与播放支持。裁剪前优先保留网页的原生像素密度（含 Retina），请求足够的整个标签页采样尺寸，最多 3840×2160；再把播放器区域缩至所选输出上限。除几个像素的 YUV 对齐误差外，初次输出不会把不足的区域像素放大来冒充更高分辨率；保持原宽高比，输出尺寸可能小于档位标称值。采集开始后输出尺寸固定，避免调整窗口引发编码格式变化。
+实际视频码率取决于编码器和画面内容，面板根据实际输出字节统计平均值。音频目标码率为 128 kbps。1080p/60fps 使用 H.264 Level 4.2；各档位启动前检查录制与播放支持。裁剪前优先保留网页的原生像素密度（含 Retina），请求足够的整个标签页采样尺寸，最多 3840×2160；再把播放器区域缩至所选输出上限。除几个像素的 YUV 对齐误差外，初次输出不会把不足的区域像素放大来冒充更高分辨率；保持原宽高比，输出尺寸可能小于档位标称值。采集开始后输出尺寸固定，避免调整窗口引发编码格式变化。
 
 面板分别显示播放器源视频尺寸（可读时）、采集区域实际像素、输出视频尺寸、目标编码码率、已产出的编码数据平均速率及媒体缓存时长。数据平均按实际字节数与录制经过时间计算，包含音频及封装；初始分块尚未送达时会波动。播放帧率根据输出视频计数每约 3 秒计算，扣除 droppedVideoFrames，是短时播放统计，既不是读取 30/60 的设置值，也不代表原直播每秒有同样数量的不同画面。暂停时帧率显示为空。
 
 **这里的 1080p 指输出像素尺寸，无法保证与原生 1080p 直播流同等清晰。**本方案采集浏览器渲染的画面再有损编码；源视频分辨率、播放器显示大小、Chrome 采样和重编码都会影响画质。更高码率可减少压缩损失，无法恢复已丢失的细节。1080p/60fps 的缓冲数据及 CPU/GPU、内存、耗电开销更高，75 秒缓冲在 20 Mbps 下仅视频数据就约 188 MB，实际总开销还包含解码与浏览器缓存。所有媒体 `src/currentTime` 写操作仅用于扩展自己的元素。
 
-播放缓冲按当前延迟保留约「延迟 + 0.75 + 6」秒，最多 75 秒；媒体时间每前进约 1 秒即可清理旧数据。30 秒模式通常只保留约 37 秒及关键帧/分块对齐余量，避免低延迟时还占用 75 秒数据。编码待发送队列与播放待追加队列按档位的两倍视频目标给出约 12 秒编码数据的预算，低档分别保留 8/16 MiB 的最低上限，1080p/60 档约 29 MiB，队列硬上限 32 MiB；这是有界待处理队列，不是整个媒体缓冲。MP4 分块可能跨越数秒，timeslice=250ms 不保证每块都很小。遇到 Chrome 媒体配额时，回收已播放的历史（保留当前位置前 1.5 秒），保留原块重试；没有可回收数据仍失败则安全停止。更长延迟和高码率组合可能受浏览器配额限制，需要降低档位。这里的「配额」是 Chrome 的媒体缓存内存上限，不是账号额度或流量；其大小受浏览器与内存压力影响，无法保证一个固定数值。缓存满且无法回收时，面板会明确提示降低画质或缩短延迟。停止/错误清理等待编码器 stop 事件和既有资源释放任务，再销毁 Offscreen；新采集在旧清理完成后才取新的流 ID。超过上限、编码/解码错误、数据序号断裂或消费者长时间失去响应时安全停止并要求重启，不无限重试。浏览器媒体缓存本身还有开销及配额，不能仅凭码率估算总内存。
+播放缓冲按当前延迟保留约「延迟 + 0.75 + 6」秒，最多 75 秒；媒体时间每前进约 1 秒即可清理旧数据。30 秒模式通常只保留约 37 秒及关键帧/分块对齐余量，避免低延迟时还占用 75 秒数据。编码待发送队列与播放待追加队列按档位的两倍视频目标给出约 12 秒编码数据的预算，低档分别保留 8/16 MiB 的最低上限，1080p/60 档约 29 MiB，队列硬上限 32 MiB；这是有界待处理队列，不是整个媒体缓冲。若另一条轨道或播放页落后，待封装和未确认接收的数据分别受限。遇到 Chrome 媒体配额时，回收已播放的历史（保留当前位置前 1.5 秒），保留原块重试；没有可回收数据仍失败则安全停止。更长延迟和高码率组合可能受浏览器配额限制，需要降低档位。这里的「配额」是 Chrome 的媒体缓存内存上限，不是账号额度或流量；其大小受浏览器与内存压力影响，无法保证一个固定数值。缓存满且无法回收时，面板会明确提示降低画质或缩短延迟。停止和错误清理关闭编解码器，取消轨道读取并等待既有资源释放任务，再销毁 Offscreen；新采集在旧清理完成后才取新的流 ID。超过上限、编码/解码错误、数据序号断裂或消费者长时间失去响应时安全停止并要求重启，不无限重试。浏览器媒体缓存本身还有开销及配额，不能仅凭码率估算总内存。
 
 音画模式额外预留 0.75 秒播放缓冲，并有采集、编码、分块和设备开销；**0 秒设置也存在基础延迟**。面板的目标值和播放页「缓冲位置差」都不是端到端测量，测试结果见 TESTING.md。调节以共享的单调时钟和播放时间为基准，避免编码分块不准时导致 −0.5 秒反而后退。增加延迟按差值倒计时，采集卡顿时仍可能需要等待可播放数据。恢复严重卡顿时会在扩展输出页做一次跳转校准，不使用加速追赶。
 
@@ -119,8 +123,6 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 - [Chrome tabCapture](https://developer.chrome.com/docs/extensions/reference/api/tabCapture)：用户调用扩展后采集、原声抑制、Chrome 116+ 的 ID 使用范围与单次短期有效性。
 - [Chrome 音频捕获示例](https://developer.chrome.com/docs/extensions/how-to/web-platform/screen-capture)：Service Worker + USER_MEDIA Offscreen 架构。
-- [Canvas captureStream](https://developer.chrome.com/blog/capture-stream/)：扩展画布的尺寸和帧率。
-- [Chromium MediaRecorder 编码器](https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/modules/mediarecorder/media_recorder_encoder_wrapper.cc)：当前实现的可变码率与两倍峰值预算。
 - [Chrome Offscreen](https://developer.chrome.com/docs/extensions/reference/api/offscreen)：仅 runtime API、文档生命周期与 AUDIO_PLAYBACK 静音超时。
 - [Chrome action](https://developer.chrome.com/docs/extensions/reference/api/action)：default_popup 与 onClicked 的互斥行为。
 - [MDN MediaSource](https://developer.mozilla.org/en-US/docs/Web/API/MediaSource)：连续媒体缓冲与统一音画播放。
@@ -129,3 +131,5 @@ python3 -m http.server 8765 --bind 127.0.0.1
 - [Web Audio 规范](https://www.w3.org/TR/webaudio/)：DelayNode、AudioParam 和音频时钟行为。
 
 文档核对日期：2026-10-10。
+- [WebCodecs](https://www.w3.org/TR/webcodecs/)
+- [Media Source 的 ISO BMFF 分片格式](https://www.w3.org/TR/mse-byte-stream-format-isobmff/)

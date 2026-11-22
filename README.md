@@ -9,7 +9,7 @@
 独立延迟浏览器标签页的声音，或同时延迟播放器画面与声音。
 专为 F1 双流观看场景制作，也适用于其他网页直播。
 
-[![Version](https://img.shields.io/badge/version-1.3.1-2769d3)](manifest.json)
+[![Version](https://img.shields.io/badge/version-1.4.0-2769d3)](manifest.json)
 [![Chrome](https://img.shields.io/badge/Chrome-116%2B-f0b429)](#quick-start)
 [![Manifest](https://img.shields.io/badge/Manifest-V3-6b5bd2)](manifest.json)
 [![License](https://img.shields.io/badge/license-MIT-27a46a)](LICENSE)
@@ -32,7 +32,7 @@
 
 它通过 Chrome 标签页捕获 API 获取浏览器输出，在本机完成缓冲与延迟播放。
 
-当前版本：**[1.3.1](https://github.com/Aurxs/BilibiliLiveDelay/releases/tag/v1.3.1)**。
+本分支开发版本为 **1.4.0**。已发布版本：**[1.3.1](https://github.com/Aurxs/BilibiliLiveDelay/releases/tag/v1.3.1)**。
 
 <a id="features"></a>
 
@@ -55,7 +55,7 @@
 
 ## 快速安装
 
-**桌面浏览器兼容性**：已在 macOS 的 Chrome 和 Edge 上运行纯音频与音画模式。其他桌面 Chromium 浏览器如果支持本项目所用的 Manifest V3 扩展接口，理论上也可使用。纯音频依赖标签页采集和后台文档，音画模式还要求浏览器支持 MP4（H.264/AAC）录制与播放。实测版本和已知现象见[验证记录](TESTING.md)。
+**桌面浏览器兼容性**：已在 macOS 的 Chrome 和 Edge 上运行纯音频与音画模式。其他桌面 Chromium 浏览器如果支持本项目所用的 Manifest V3 扩展接口，理论上也可使用。纯音频依赖标签页采集和后台文档，本分支的音画模式需要 WebCodecs H.264 编码、AAC 编解码和 MediaSource 分片 MP4 播放能力。实测版本和已知现象见[验证记录](TESTING.md)。
 
 想确认自己的浏览器能否使用？打开[浏览器兼容性自测](https://aurxs.github.io/BilibiliLiveDelay/)。打开即可看到当前浏览器的音视频检测结果，以及按版本估算的 Manifest V3、`tabCapture` 和 `offscreen` 支持情况。推荐使用最新版桌面 [Google Chrome](https://www.google.cn/chrome/)。
 
@@ -268,7 +268,8 @@ BilibiliLiveDelay/
 ├── offscreen.html / offscreen.js  # 独立采集入口
 ├── audio-engine.js / audio-graph.js
 ├── av-engine.js / av-playback.js
-├── player-locator.js / video-cropper.js / video-options.js
+├── player-locator.js / video-options.js
+├── av-encoder.js / aac-priming.js / fragmented-mp4.js
 ├── control.html / control.js / control.css
 ├── viewer.html / viewer.js / viewer.css
 ├── crop.html / crop.js / crop.css

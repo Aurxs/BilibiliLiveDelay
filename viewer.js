@@ -43,8 +43,11 @@ channel.onmessage = async ({ data }) => {
     try { await playback.configure(data.mime, data.delay); channel.postMessage({ type: "READY" }); }
     catch (error) { playback.fail(error.message); }
   }
-  if (data.type === "CHUNK") playback.append(data.bytes, data.sequence);
-  if (data.type === "STARTED") playback.origin = data.origin;
+  if (data.type === "CHUNK") {
+    playback.append(data.bytes, data.sequence);
+    if (!playback.closed) channel.postMessage({ type: "RECEIVED", sequence: data.sequence });
+  }
+  if (data.type === "STARTED" || data.type === "CLOCK") playback.origin = data.origin;
   if (data.type === "DELAY") { lastReport = 0; playback.setDelay(data.delay); }
   if (data.type === "STOP") {
     ended = true;

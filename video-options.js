@@ -9,11 +9,8 @@ export function videoOptions(value = {}) {
     region: ["player", "manual", "tab"].includes(value.region) ? value.region : "player" };
 }
 export function queueBudget(bitrate) {
-  // MP4 native fragments may span seconds despite a 250ms timeslice. A single
-  // healthy high-bitrate fragment is not a producer backlog. Bound both sides
-  // to twelve seconds of encoded data, with the existing low-bitrate floors.
-  // Current Chromium uses variable video bitrate with a peak budget up to
-  // twice the target. Size the transfer queues for that peak, not the label.
+  // Allow bursty output at twice the requested bitrate. Encoded data waiting
+  // for the other track, delivery, and MSE each has a bounded budget.
   const twelveSeconds = Math.ceil((bitrate * 2 + 128_000) * 12 / 8);
   return { pending: Math.min(32 * 1024 * 1024, Math.max(8 * 1024 * 1024, twelveSeconds)),
     playback: Math.min(32 * 1024 * 1024, Math.max(16 * 1024 * 1024, twelveSeconds)) };

@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VIDEO_PRESETS, videoOptions, captureSize, cropPixels, outputSize, queueBudget } from '../video-options.js';
 import { locatePlayer } from '../player-locator.js';
-import { VideoCropper } from '../video-cropper.js';
 
 test('crop coordinates map to native pixels; quality stays bounded and never initially upscales', () => {
   const geometry = { viewport: { width: 1600, height: 1000 }, rect: { x: 0.05, y: 0.1, width: 0.8, height: 0.72 } };
@@ -35,37 +34,6 @@ test('locator reads video bounds without mutations; clipped or stale manual regi
     assert.match(locatePlayer(null).error, /未完整显示/);
     assert.match(locatePlayer(null, 'manual', { viewport: { width: 1600, height: 900 } }).error, /重新框选/);
   } finally {
-    for (const name of names) { if (originals[name]) Object.defineProperty(globalThis, name, originals[name]); else delete globalThis[name]; }
-  }
-});
-
-test('native crop physically scales capture frames, declares canvas FPS, releases frames and cancels pending reads on Stop', async () => {
-  const names = ['VideoFrame', 'MediaStreamTrackProcessor', 'HTMLCanvasElement', 'document'];
-  const originals = Object.fromEntries(names.map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]));
-  let inputCloses = 0, outputCloses = 0, stopped = 0, requests = 0, canvas, format, drawn;
-  const frame = { timestamp: 1234567, visibleRect: { x: 0, y: 0, width: 1920, height: 1080 }, close: () => { inputCloses++; } };
-  globalThis.MediaStreamTrackProcessor = class { constructor() { this.readable = new ReadableStream({ start(controller) { controller.enqueue(frame); } }); } };
-  globalThis.VideoFrame = class { constructor(input, init) { this.timestamp = init.timestamp ?? input.timestamp; this.input = input; this.init = init; } close() { if (!this.closed) { this.closed = true; outputCloses++; } } };
-  globalThis.HTMLCanvasElement = class {
-    getContext() { return { drawImage(...args) { drawn = args; } }; }
-    captureStream(fps) {
-      assert.equal(fps, 30);
-      return { getVideoTracks: () => [{ requestFrame() { requests++; }, stop() { stopped++; } }] };
-    }
-  };
-  globalThis.document = { createElement(name) { assert.equal(name, 'canvas'); canvas = new HTMLCanvasElement(); return canvas; } };
-  const cropper = new VideoCropper({ geometry: { rect: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } }, preset: VIDEO_PRESETS['720p30'],
-    onFormat: value => { format = value; }, onError: error => assert.fail(error) });
-  try {
-    await cropper.start({});
-    assert.deepEqual(drawn[0].init.visibleRect, { x: 480, y: 270, width: 960, height: 540 });
-    assert.equal(canvas.width, 960); assert.equal(canvas.height, 540); assert.equal(requests, 1);
-    assert.equal(format.width, 960); assert.equal(format.height, 540);
-    await cropper.close();
-    assert.equal(inputCloses, 1); assert.equal(outputCloses, 1); assert.equal(stopped, 1);
-    assert.equal(canvas.width, 0); assert.equal(canvas.height, 0);
-  } finally {
-    await cropper.close();
     for (const name of names) { if (originals[name]) Object.defineProperty(globalThis, name, originals[name]); else delete globalThis[name]; }
   }
 });

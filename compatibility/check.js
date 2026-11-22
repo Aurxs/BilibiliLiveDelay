@@ -13,11 +13,17 @@ function render(id, checks) {
   }
 }
 
-function supportsFormat(level) {
-  return ["4200", "42E0"].some(profile => {
-    const mime = `video/mp4;codecs=avc1.${profile}${level},mp4a.40.2`;
-    return globalThis.MediaRecorder?.isTypeSupported?.(mime) && globalThis.MediaSource?.isTypeSupported?.(mime);
-  });
+async function supportsFormat(level, fps) {
+  if (!globalThis.VideoEncoder || !globalThis.AudioEncoder || !globalThis.AudioDecoder || !globalThis.MediaSource || !globalThis.MediaStreamTrackProcessor) return false;
+  try {
+    const codec = "avc1.4200" + level;
+    const [video, audio, decode] = await Promise.all([
+      VideoEncoder.isConfigSupported({ codec, width: 1920, height: 1080, framerate: fps, bitrate: 8000000, latencyMode: "realtime", avc: { format: "avc" } }),
+      AudioEncoder.isConfigSupported({ codec: "mp4a.40.2", sampleRate: 48000, numberOfChannels: 2, bitrate: 128000 }),
+      AudioDecoder.isConfigSupported({ codec: "mp4a.40.2", sampleRate: 48000, numberOfChannels: 2, description: Uint8Array.of(0x11, 0x90) }),
+    ]);
+    return video.supported && audio.supported && decode.supported && MediaSource.isTypeSupported(`video/mp4;codecs=${codec},mp4a.40.2`);
+  } catch { return false; }
 }
 
 // Use product brands where available. A generic Chromium signature alone
@@ -54,20 +60,22 @@ const framework = labels.map((label, i) => {
 });
 render("extension-results", framework);
 
-const media = [
-  ["纯音频延迟 · Web Audio", typeof globalThis.AudioContext?.prototype.createDelay === "function"],
-  ["播放器区域裁剪", !!globalThis.MediaStreamTrackProcessor && !!globalThis.VideoFrame
-    && !!globalThis.HTMLCanvasElement?.prototype.captureStream && !!globalThis.CanvasCaptureMediaStreamTrack?.prototype.requestFrame],
-  ["MP4 录制与播放 · 720p / 1080p30", supportsFormat("28")],
-  ["MP4 录制与播放 · 1080p60", supportsFormat("2a")],
-];
-render("media-results", media.map(([label, supported]) => [label, supported ? "支持" : "不支持"]));
+async function reportMedia() {
+  const media = [
+    ["纯音频延迟 · Web Audio", typeof globalThis.AudioContext?.prototype.createDelay === "function"],
+    ["播放器区域裁剪", !!globalThis.MediaStreamTrackProcessor && !!globalThis.VideoFrame],
+    ["MP4 录制与播放 · 720p / 1080p30", await supportsFormat("28", 30)],
+    ["MP4 录制与播放 · 1080p60", await supportsFormat("2a", 60)],
+  ];
+  render("media-results", media.map(([label, supported]) => [label, supported ? "支持" : "不支持"]));
 
-const name = [browser.name, browser.version].filter(Boolean).join(" ");
-let summary;
-if (browser.mobile) summary = "本插件面向桌面浏览器，请在电脑上打开此页。";
-else if (framework.some(([, status]) => status === "预计不支持")) summary = "当前版本预计缺少插件所需的扩展能力。";
-else if (!minimums.length) summary = "扩展框架支持情况待确认，音视频检测结果见下方。";
-else if (media.every(([, supported]) => supported)) summary = "预计可使用纯音频和音画延迟。";
-else summary = "部分音视频能力不可用，详见下方。";
-document.getElementById("summary").textContent = name + " · " + summary;
+  const name = [browser.name, browser.version].filter(Boolean).join(" ");
+  let summary;
+  if (browser.mobile) summary = "本插件面向桌面浏览器，请在电脑上打开此页。";
+  else if (framework.some(([, status]) => status === "预计不支持")) summary = "当前版本预计缺少插件所需的扩展能力。";
+  else if (!minimums.length) summary = "扩展框架支持情况待确认，音视频检测结果见下方。";
+  else if (media.every(([, supported]) => supported)) summary = "预计可使用纯音频和音画延迟。";
+  else summary = "部分音视频能力不可用，详见下方。";
+  document.getElementById("summary").textContent = name + " · " + summary;
+}
+void reportMedia();
