@@ -97,8 +97,18 @@ async function closeViewer(state) {
   if (!Number.isInteger(state?.viewerTabId)) return;
   // Check identity as well as ID before closing an output tab.
   try {
+    // Edge can omit tabs.Tab.url without the broad tabs permission. The
+    // extension context identifies our own document with the same precision.
     const tab = await chrome.tabs.get(state.viewerTabId);
-    if (tab.url === chrome.runtime.getURL(`viewer.html#${state.sessionId}`)) await chrome.tabs.remove(tab.id);
+    const documentUrl = chrome.runtime.getURL(`viewer.html#${state.sessionId}`);
+    if (tab.url && tab.url !== documentUrl) return;
+    if (!tab.url) {
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: ["TAB"], tabIds: [tab.id], frameIds: [0], documentUrls: [documentUrl],
+      });
+      if (!contexts.length) return;
+    }
+    await chrome.tabs.remove(tab.id);
   } catch { /* already closed */ }
 }
 

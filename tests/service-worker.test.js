@@ -24,7 +24,10 @@ async function fixture({ beforeStart = async () => {}, onCapture = () => {} } = 
   const api = {
     runtime: {
       id: "test-id", getURL: name => `chrome-extension://test-id/${name}`,
-      getContexts: async filter => filter.contextTypes.includes("OFFSCREEN_DOCUMENT") && offscreen ? [{}] : [],
+      getContexts: async filter => {
+        if (filter.contextTypes.includes("OFFSCREEN_DOCUMENT")) return offscreen ? [{}] : [];
+        return [...viewers.values()].filter(tab => filter.tabIds.includes(tab.id) && filter.documentUrls.includes(tab.url));
+      },
       onMessage: event(), onInstalled: event(), onStartup: event(),
       sendMessage: async message => {
         if (message.target === "control") return;
@@ -134,6 +137,19 @@ test("late stopped event does not end a new active capture; real closure release
   const ended = await f.message("STATE");
   assert.equal(ended.state.phase, "interrupted"); assert.equal(ended.state.active, false);
   assert.equal(f.closes(), 1);
+});
+
+test("Stop closes only the session viewer when Edge hides tabs.Tab.url", async () => {
+  const f = await fixture();
+  await f.message("START", { tabId: 8, mode: "av" });
+  f.api.tabs.get = async id => id === f.tab.id ? f.tab : { id };
+  await f.message("STOP");
+  assert.deepEqual(f.removed, [9]);
+
+  await f.message("START", { tabId: 8, mode: "av" });
+  f.viewers.get(9).url = "https://example.test/";
+  await f.message("STOP");
+  assert.deepEqual(f.removed, [9]);
 });
 
 test("settings survive worker restart; internal pages do not start capture", async () => {

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>浏览器兼容性自测 · BilibiliLiveDelay</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="check.js" defer></script>
+</head>
+<body>
+<main>
+  <header><a href="https://github.com/Aurxs/BilibiliLiveDelay">BilibiliLiveDelay ↗</a>
+    <h1>浏览器兼容性自测</h1>
+    <p id="intro">网页可以检测音视频接口。要检查 Manifest V3 和标签页采集权限，需要在浏览器的扩展环境中运行检测。</p>
+  </header>
+  <section id="install">
+    <h2>检测扩展框架</h2>
+    <ol><li>下载并解压检测工具。</li><li>打开浏览器的扩展管理页，开启开发者模式，选择「加载已解压的扩展程序」。Chrome 使用 <code>chrome://extensions</code>，Edge 使用 <code>edge://extensions</code>。</li><li>选择含 <code>manifest.json</code> 的文件夹，然后点击工具栏里的「直播延迟兼容性检测」。检测完即可移除。</li></ol>
+    <a class="button" href="compatibility-check.zip" download>下载检测工具 ZIP ↓</a>
+    <p class="note">检测工具在本机运行。它检查接口并创建临时后台文档，不录制标签页。</p>
+  </section>
+  <section><h2>扩展接口</h2><p id="framework" role="status">等待扩展环境运行检测。</p><dl id="extension-results"></dl></section>
+  <section><h2>音视频接口</h2><dl id="media-results"></dl><p class="note">编码和播放结果是浏览器对格式的支持声明。实测时请用正式扩展在普通网页上分别启动纯音频和音画模式。</p></section>
+  <footer><a href="https://github.com/Aurxs/BilibiliLiveDelay#quick-start">正式扩展安装说明 ↗</a></footer>
+</main>
+</body></html>

@@ -6,7 +6,7 @@
 
 **让直播解说，跟上你正在看的画面。**
 
-独立延迟 Chrome 标签页的声音，或同时延迟播放器画面与声音。
+独立延迟浏览器标签页的声音，或同时延迟播放器画面与声音。
 专为 F1 双流观看场景制作，也适用于其他网页直播。
 
 [![Version](https://img.shields.io/badge/version-1.3.0-2769d3)](manifest.json)
@@ -55,6 +55,10 @@
 
 ## 快速安装
 
+**桌面浏览器兼容性**：已在 macOS 的 Chrome 和 Edge 上运行纯音频与音画模式。其他桌面 Chromium 浏览器如果支持本项目所用的 Manifest V3 扩展接口，理论上也可使用。纯音频依赖标签页采集和后台文档，音画模式还要求浏览器支持 MP4（H.264/AAC）录制与播放。实测版本和已知现象见[验证记录](TESTING.md)。
+
+想确认自己的浏览器能否使用？打开[浏览器兼容性自测](https://aurxs.github.io/BilibiliLiveDelay/)。网页会检查媒体接口，下载页内的检测工具还可以检查扩展后台、`tabCapture`、`offscreen` 等能力。
+
 ### 1. 下载扩展
 
 打开 **[最新 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest)**，下载附件中的 **`BilibiliLiveDelay-v版本号.zip`** 并解压。ZIP 里直接包含可加载的扩展文件，无需构建。
@@ -67,10 +71,10 @@ Release 同时提供签名 **CRX3** 包和 **`SHA256SUMS`** 校验文件。Chrom
 git clone https://github.com/Aurxs/BilibiliLiveDelay.git
 ```
 
-### 2. 加载到 Chrome
+### 2. 加载到浏览器
 
-1. 使用 **Chrome 116+**，打开 `chrome://extensions`。
-2. 开启右上角的「开发者模式」。
+1. 在 **Chrome 116+** 打开 `chrome://extensions`，或在桌面版 **Edge** 打开 `edge://extensions`。
+2. 开启「开发者模式」。
 3. 点击「加载已解压的扩展程序」，选择解压后包含 `manifest.json` 的 **扩展文件夹**。
 4. 在工具栏扩展菜单中固定 **Live Audio Sync · 直播音画延迟**。
 
@@ -273,7 +277,7 @@ BilibiliLiveDelay/
 
 ## 参与贡献
 
-欢迎 [提交 Issue](https://github.com/Aurxs/BilibiliLiveDelay/issues) 或 Pull Request。报告问题时请附上 Chrome 版本、操作系统、模式、画质、目标延迟及面板错误。
+欢迎 [提交 Issue](https://github.com/Aurxs/BilibiliLiveDelay/issues) 或 Pull Request。报告问题时请附上浏览器名称与版本、操作系统、模式、画质、目标延迟及面板错误。
 
 改动请保持播放器定位只读，不引入源播放器控制或直播请求拦截，并只验证相关行为。
 
