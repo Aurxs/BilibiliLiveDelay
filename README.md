@@ -9,7 +9,7 @@
 独立延迟浏览器标签页的声音，或同时延迟播放器画面与声音。
 专为 F1 双流观看场景制作，也适用于其他网页直播。
 
-[![Version](https://img.shields.io/badge/version-1.3.0-2769d3)](manifest.json)
+[![Version](https://img.shields.io/badge/version-1.3.1-2769d3)](manifest.json)
 [![Chrome](https://img.shields.io/badge/Chrome-116%2B-f0b429)](#quick-start)
 [![Manifest](https://img.shields.io/badge/Manifest-V3-6b5bd2)](manifest.json)
 [![License](https://img.shields.io/badge/license-MIT-27a46a)](LICENSE)
@@ -32,7 +32,7 @@
 
 它通过 Chrome 标签页捕获 API 获取浏览器输出，在本机完成缓冲与延迟播放。
 
-当前版本：**[1.3.0](https://github.com/Aurxs/BilibiliLiveDelay/releases/tag/v1.3.0)**。
+当前版本：**[1.3.1](https://github.com/Aurxs/BilibiliLiveDelay/releases/tag/v1.3.1)**。
 
 <a id="features"></a>
 
@@ -259,7 +259,7 @@ npm run package -- --key /path/to/private-key.pem
 
 默认使用 macOS 的标准 Chrome 路径，Linux 使用 `google-chrome`；其他安装位置可通过 `CHROME_PATH` 指定可执行文件。产物在 `dist/`，仅包含根目录的扩展 JS、HTML、CSS、清单及许可证，不包含测试、文档或开发配置。需要新增子目录资源时，应同步更新打包脚本。
 
-发布下一版本时，先同步两个版本文件、提交并推送，再创建与版本一致的标签，例如 `git tag v1.3.1` 后 `git push origin v1.3.1`。可在 `docs/releases/v版本号.md` 提供该版本发布说明；未提供时由 GitHub 自动生成。
+发布下一版本时，先同步两个版本文件、提交并推送，再创建与版本一致的标签，例如 `git tag v1.3.2` 后 `git push origin v1.3.2`。可在 `docs/releases/v版本号.md` 提供该版本发布说明；未提供时由 GitHub 自动生成。
 
 ```text
 BilibiliLiveDelay/
