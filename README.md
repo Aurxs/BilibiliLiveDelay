@@ -59,17 +59,9 @@
 
 想确认自己的浏览器能否使用？打开[浏览器兼容性自测](https://aurxs.github.io/BilibiliLiveDelay/)。打开即可看到当前浏览器的音视频检测结果，以及按版本估算的 Manifest V3、`tabCapture` 和 `offscreen` 支持情况。推荐使用最新版桌面 [Google Chrome](https://www.google.cn/chrome/)。
 
-### 1. 下载扩展
+### 1. 下载并解压扩展 ZIP（推荐）
 
-点击 **[下载最新整合包](https://download.aurxs.dev/BilibiliLiveDelay.zip)** 并解压。内含签名 CRX、扩展 ZIP 和《安装说明.txt》。Chrome / Edge 用户请再解压里面的 ZIP，得到含有 `manifest.json` 的扩展文件夹。也可以从 [GitHub Release](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest) 单独下载附件。
-
-Release 同时提供签名 **CRX3** 包和 **`SHA256SUMS`** 校验文件。Chrome 用户使用 ZIP 即可；CRX 供支持侧载的浏览器使用。
-
-开发者也可以克隆仓库：
-
-```bash
-git clone https://github.com/Aurxs/BilibiliLiveDelay.git
-```
+**Chrome 和 Edge 用户建议使用 ZIP 安装。** 从 [GitHub 最新 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest) 的附件中下载扩展 ZIP，解压到一个打算长期保留的文件夹。也可以[下载最新整合包](https://download.aurxs.dev/BilibiliLiveDelay.zip)：先解压整合包，再解压里面的扩展 ZIP。下一步要选择的是能直接看到 `manifest.json` 的文件夹。
 
 ### 2. 加载到浏览器
 
@@ -79,6 +71,16 @@ git clone https://github.com/Aurxs/BilibiliLiveDelay.git
 4. 在工具栏扩展菜单中固定 **Live Audio Sync · 直播音画延迟**。
 
 完成。安装无需 Node.js，也无需启动服务器。
+
+### 什么时候可以用 CRX？
+
+CRX 是签名的扩展安装包，适用于以下情况：
+
+- **Linux 版 Google Chrome** 支持手动安装商店外的 CRX。
+- **由组织管理的 Windows 或 macOS 版 Chrome** 可以由管理员通过企业策略部署自托管的 CRX。
+- **其他浏览器**如果明确支持安装本地 CRX，可以按该浏览器的说明安装。
+
+在普通个人 Windows 或 Mac 上，即使 CRX 已由项目签名，直接拖进 Chrome 仍可能被禁用，并显示“该扩展程序未列在 Chrome 应用商店中”。遇到这条提示，请使用上面的 ZIP 安装步骤。[Chrome 官方分发说明](https://developer.chrome.com/docs/extensions/how-to/distribute)
 
 ## 使用：F1 双流同步
 
