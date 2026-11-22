@@ -14,7 +14,7 @@
 [![Manifest](https://img.shields.io/badge/Manifest-V3-6b5bd2)](manifest.json)
 [![License](https://img.shields.io/badge/license-MIT-27a46a)](LICENSE)
 
-**[下载最新版本 →](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest)** · [所有 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases)
+**[直接下载最新版 ZIP →](https://download.aurxs.dev/BilibiliLiveDelay.zip)** · [所有 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases)
 
 [快速安装](#quick-start) · [功能](#features) · [工作原理](#how-it-works) · [测试记录](TESTING.md) · [反馈问题](https://github.com/Aurxs/BilibiliLiveDelay/issues)
 
@@ -61,7 +61,7 @@
 
 ### 1. 下载扩展
 
-打开 **[最新 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest)**，下载附件中的 **`BilibiliLiveDelay-v版本号.zip`** 并解压。ZIP 里直接包含可加载的扩展文件，无需构建。
+点击 **[下载最新版 ZIP](https://download.aurxs.dev/BilibiliLiveDelay.zip)** 并解压。也可以从 [GitHub Release](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest) 下载同一份安装包。ZIP 里直接包含可加载的扩展文件，无需构建。
 
 Release 同时提供签名 **CRX3** 包和 **`SHA256SUMS`** 校验文件。Chrome 用户使用 ZIP 即可；CRX 供支持侧载的浏览器使用。
 
@@ -246,6 +246,8 @@ npm test
 ### 打包与发布
 
 GitHub Actions 在推送 `main` 或手动运行 **Package extension** 时生成 CRX、ZIP 与 SHA-256 校验文件，可在 Actions 的 Artifacts 中下载。推送 **`v版本号` 标签**时，会在打包成功后自动发布带附件的 [GitHub Release](https://github.com/Aurxs/BilibiliLiveDelay/releases)。标签、`manifest.json` 和 `package.json` 的版本必须一致。
+
+GitHub 的 Release webhook 会通知 Cloudflare Pages 同步最新正式版。下载服务校验附件的 SHA-256 后，将 ZIP 和版本信息一起写入 Workers KV。固定链接从 Cloudflare 提供文件，边缘缓存约两分钟。若同步失败，可在 GitHub 仓库的 Webhooks 设置中重新投递该事件。
 
 维护者需在仓库 Actions Secrets 中配置 **`CRX_PRIVATE_KEY`**，值为 RSA 私钥的完整 PEM 内容。所有版本复用同一把密钥，CRX 和 ZIP 的扩展 ID 因此保持一致；缺失密钥时打包会直接失败。私钥仅用于签名，不会进入安装包或 Git。
 
