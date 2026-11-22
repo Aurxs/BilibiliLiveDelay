@@ -57,7 +57,7 @@
 
 **桌面浏览器兼容性**：已在 macOS 的 Chrome 和 Edge 上运行纯音频与音画模式。其他桌面 Chromium 浏览器如果支持本项目所用的 Manifest V3 扩展接口，理论上也可使用。纯音频依赖标签页采集和后台文档，音画模式还要求浏览器支持 MP4（H.264/AAC）录制与播放。实测版本和已知现象见[验证记录](TESTING.md)。
 
-想确认自己的浏览器能否使用？打开[浏览器兼容性自测](https://aurxs.github.io/BilibiliLiveDelay/)。网页会检查媒体接口，下载页内的检测工具还可以检查扩展后台、`tabCapture`、`offscreen` 等能力。
+想确认自己的浏览器能否使用？打开[浏览器兼容性自测](https://aurxs.github.io/BilibiliLiveDelay/)。打开即可看到当前浏览器的音视频检测结果，以及按版本估算的 Manifest V3、`tabCapture` 和 `offscreen` 支持情况。推荐使用最新版桌面 [Google Chrome](https://www.google.cn/chrome/)。
 
 ### 1. 下载扩展
 

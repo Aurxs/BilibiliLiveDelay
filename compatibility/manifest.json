@@ -1,8 +1,0 @@
-{
-  "manifest_version": 3,
-  "name": "直播延迟兼容性检测",
-  "version": "1.0.0",
-  "permissions": ["activeTab", "tabCapture", "offscreen", "storage", "scripting"],
-  "action": { "default_popup": "index.html" },
-  "background": { "service_worker": "worker.js", "type": "module" }
-}
