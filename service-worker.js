@@ -224,11 +224,26 @@ async function cropPicker(message) {
   return { saved: true };
 }
 
-async function setDelay(value) {
+async function setDelay(value, sessionId) {
   const delay = normalizeDelay(value);
-  const state = await readState();
-  const next = await hasOffscreen() ? await engineMessage("DELAY", { delay }) : { ...state, delay };
+  const useEngine = sessionId || await hasOffscreen();
+  const next = useEngine ? await engineMessage("DELAY", { delay, sessionId }) : { ...await readState(), delay };
   await chrome.storage.local.set({ delay });
+  return remember(next);
+}
+
+async function viewerCommand(message, tabId) {
+  const state = await readState();
+  if (!state.active || state.mode !== "av" || state.viewerTabId !== tabId || state.sessionId !== message.sessionId) {
+    throw new Error("此播放页的采集已结束。");
+  }
+  if (message.type === "DELAY") {
+    if (message.step === undefined) return setDelay(message.delay, state.sessionId);
+    if (![-0.5, -0.1, 0.1, 0.5].includes(message.step)) throw new Error("无效的微调步进。");
+    return setDelay(state.delay + message.step, state.sessionId);
+  }
+  const next = await engineMessage("QUALITY", { sessionId: state.sessionId, quality: message.quality });
+  await chrome.storage.local.set({ videoOptions: videoOptions(next) });
   return remember(next);
 }
 
@@ -263,6 +278,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     });
   } else if (fromCrop && ["CROP_DATA", "CROP_SAVE"].includes(message.type)) {
     operation = enqueue(() => cropPicker(message));
+  } else if (["DELAY", "QUALITY"].includes(message.type) && Number.isInteger(sender.tab?.id)
+      && message.sessionId && sender.url === chrome.runtime.getURL(`viewer.html#${message.sessionId}`)) {
+    operation = enqueue(() => viewerCommand(message, sender.tab.id));
   } else if (fromControl) {
     switch (message.type) {
       case "STATE": operation = readState(); break; // Do not block the UI behind a pending capture.

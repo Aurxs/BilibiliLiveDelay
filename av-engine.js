@@ -1,8 +1,13 @@
 import { AV_CHANNEL, idleState, normalizeDelay, errorText, withTimeout } from "./shared.js";
-import { VIDEO_PRESETS, videoOptions, captureSize, queueBudget } from "./video-options.js";
+import { VIDEO_PRESETS, videoOptions, captureSize, queueBudget, encoderConfig, videoMime } from "./video-options.js";
 import { AVEncoder } from "./av-encoder.js";
 
 const stopTracks = stream => stream.getTracks().forEach(track => track.stop());
+const maxPresetFps = Math.max(...Object.values(VIDEO_PRESETS).map(preset => preset.fps));
+function applyVideoPreset(track, size, fps) {
+  return track.applyConstraints({ width: { ideal: size.width, max: size.width },
+    height: { ideal: size.height, max: size.height }, frameRate: { min: fps, max: fps } });
+}
 
 // Owns capture/encoding only. The visible extension page is the sole A/V output.
 export class AVEngine {
@@ -31,11 +36,12 @@ export class AVEngine {
     const options = videoOptions({ quality, region });
     const preset = VIDEO_PRESETS[options.quality];
     const budget = queueBudget(preset.bitrate);
+    session.budget = budget;
     this.state = { ...idleState(normalizeDelay(delay)), ...options, mode: "av", active: true, phase: "capturing",
       tabId, tabTitle, sessionId, viewerTabId, startedAt: Date.now(), bufferRemaining: delay,
       actualDelay: null, bufferedSeconds: 0, contextState: "not-used" };
-    const config = () => ({ type: "CONFIG", mime: session.mime, delay: this.state.delay, tabTitle, quality: options.quality,
-      region: options.region, width: this.state.width, height: this.state.height, targetFps: preset.fps, maxQueuedBytes: budget.playback });
+    const config = () => ({ type: "CONFIG", mime: this.state.mime, delay: this.state.delay, tabTitle, quality: this.state.quality,
+      region: options.region, width: this.state.width, height: this.state.height, targetFps: this.state.targetFps, maxQueuedBytes: session.budget.playback });
     this.emit();
     let ready;
     const consumerReady = new Promise(resolve => { ready = resolve; });
@@ -59,13 +65,12 @@ export class AVEngine {
       if (data.type === "CLOSED") void this.fail(session, "interrupted", "延迟播放页已关闭，采集已释放，网页恢复原声。");
     };
     try {
-      session.mime = `video/mp4;codecs=avc1.4200${preset.level},mp4a.40.2`;
       if (options.region !== "tab" && !geometry?.rect) throw new Error("播放器区域定位失败，请重新启动或手动框选。");
       const size = captureSize(preset, geometry);
       const stream = await withTimeout(this.mediaDevices.getUserMedia({
         audio: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId } },
         video: { mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId,
-          maxWidth: size.width, maxHeight: size.height, minFrameRate: preset.fps, maxFrameRate: preset.fps } },
+          maxWidth: size.width, maxHeight: size.height, minFrameRate: preset.fps, maxFrameRate: maxPresetFps } },
       }), 12000, stopTracks);
       if (this.session !== session) { stopTracks(stream); return this.snapshot(); }
       session.stream = stream;
@@ -88,21 +93,25 @@ export class AVEngine {
       }
       this.state.sampleRate = sampleRate;
       const videoTrack = stream.getVideoTracks()[0];
+      // Reserve the capture source's frame-rate ceiling once. The current
+      // track constraint controls delivery and can be raised without recapture.
+      if (preset.fps < maxPresetFps) await applyVideoPreset(videoTrack, size, preset.fps);
+      if (this.session !== session) return this.snapshot();
       const settings = videoTrack.getSettings();
       Object.assign(this.state, { captureWidth: settings.width, captureHeight: settings.height,
         sourceWidth: geometry?.sourceWidth, sourceHeight: geometry?.sourceHeight,
-        frameRate: settings.frameRate, targetFps: preset.fps, videoBitrate: preset.bitrate, mime: session.mime });
+        frameRate: settings.frameRate, targetFps: preset.fps, videoBitrate: preset.bitrate, mime: videoMime(preset) });
       session.encoder = new AVEncoder({ preset, geometry: options.region === "tab" ? null : geometry, maxBytes: budget.pending,
         onFormat: format => Object.assign(this.state, format),
         onClock: (origin, first) => session.channel.postMessage({ type: first ? "STARTED" : "CLOCK", origin }),
-        onBytes: bytes => {
+        onBytes: (bytes, mime) => {
           session.lastFragment = performance.now();
           session.inFlightBytes += bytes.byteLength;
-          if (session.inFlightBytes > budget.pending) throw new Error("播放页接收编码数据过慢，请重新启动或降低画质。");
+          if (session.inFlightBytes > session.budget.pending) throw new Error("播放页接收编码数据过慢，请重新启动或降低画质。");
           session.unacknowledged.set(session.sequence, bytes.byteLength);
           session.encodedBytes += bytes.byteLength;
           this.state.encodedMbps = session.encodedBytes * 8 / 1_000_000 / Math.max(0.1, (performance.now() - session.recordingAt) / 1000);
-          session.channel.postMessage({ type: "CHUNK", sequence: session.sequence++, bytes });
+          session.channel.postMessage({ type: "CHUNK", sequence: session.sequence++, bytes, mime });
         },
         onError: error => void this.fail(session, "error", `音画编码失败：${errorText(error)}`) });
       for (const track of stream.getTracks()) {
@@ -138,6 +147,27 @@ export class AVEngine {
     this.session?.channel.postMessage({ type: "DELAY", delay: this.state.delay });
     this.emit();
     return this.snapshot();
+  }
+  async setQuality(quality) {
+    const session = this.session;
+    if (!session?.encoder || !Object.hasOwn(VIDEO_PRESETS, quality)) throw new Error("当前无法切换到所选画质。");
+    if (quality === this.state.quality) return;
+    const preset = VIDEO_PRESETS[quality];
+    if (!(await VideoEncoder.isConfigSupported(encoderConfig(preset, preset))).supported) throw new Error("此设备不支持所选画质。");
+    const videoTrack = session.stream.getVideoTracks()[0];
+    const size = captureSize(preset, session.encoder.geometry);
+    try { await applyVideoPreset(videoTrack, size, preset.fps); }
+    catch { throw new Error("当前采集不支持所选画质。"); }
+    if (this.session !== session) throw new Error("播放已结束。");
+    session.encoder.preset = preset;
+    // Older, higher-bitrate fragments can still be waiting at each stage.
+    const budget = queueBudget(preset.bitrate);
+    session.budget.pending = Math.max(session.budget.pending, budget.pending);
+    session.budget.playback = Math.max(session.budget.playback, budget.playback);
+    session.encoder.maxBytes = session.budget.pending;
+    Object.assign(this.state, { quality, mime: videoMime(preset), targetFps: preset.fps, videoBitrate: preset.bitrate,
+      frameRate: videoTrack.getSettings().frameRate });
+    session.channel.postMessage({ type: "QUALITY", quality, maxQueuedBytes: session.budget.playback });
   }
   async setRegion({ sessionId, geometry, error }) {
     const session = this.session;

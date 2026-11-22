@@ -4,6 +4,11 @@ export const VIDEO_PRESETS = {
   "1080p30": { width: 1920, height: 1080, fps: 30, bitrate: 8_000_000, level: "28", label: "1080p / 30fps" },
   "1080p60": { width: 1920, height: 1080, fps: 60, bitrate: 10_000_000, level: "2a", label: "1080p / 60fps" },
 };
+export const videoMime = preset => `video/mp4;codecs=avc1.4200${preset.level},mp4a.40.2`;
+export function encoderConfig(preset, { width, height }) {
+  return { width, height, codec: "avc1.4200" + preset.level, avc: { format: "avc" },
+    bitrate: preset.bitrate, framerate: preset.fps, latencyMode: "realtime" };
+}
 export function videoOptions(value = {}) {
   return { quality: Object.hasOwn(VIDEO_PRESETS, value.quality) ? value.quality : "720p30",
     region: ["player", "manual", "tab"].includes(value.region) ? value.region : "player" };

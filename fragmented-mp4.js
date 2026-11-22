@@ -73,7 +73,8 @@ function trackRun(id, samples, dataOffset) {
 export function mediaSegment(sequence, video, audio) {
   const header = full("mfhd", 0, 0, u32(sequence));
   const videoBytes = video.reduce((n, s) => n + s.data.length, 0);
-  const makeHeader = offset => box("moof", header, trackRun(videoId, video, offset), trackRun(audioId, audio, offset + videoBytes));
+  const makeHeader = offset => box("moof", header, trackRun(videoId, video, offset),
+    ...(audio.length ? [trackRun(audioId, audio, offset + videoBytes)] : []));
   const offset = makeHeader(0).length + 8;
   const payload = [...video, ...audio].map(s => s.data);
   const size = payload.reduce((n, data) => n + data.length, 8);

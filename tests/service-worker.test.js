@@ -36,6 +36,7 @@ async function fixture({ beforeStart = async () => {}, onCapture = () => {} } = 
         if (message.type === "STOP") engine = idleState(engine.delay);
         if (message.type === "INTERRUPT") engine = { ...engine, active: false, phase: "interrupted", error: message.reason };
         if (message.type === "DELAY") engine.delay = message.delay;
+        if (message.type === "QUALITY") engine.quality = message.quality;
         return { ok: true, state: structuredClone(engine) };
       },
     },
@@ -64,10 +65,11 @@ async function fixture({ beforeStart = async () => {}, onCapture = () => {} } = 
   globalThis.chrome = api;
   const load = () => import(`../service-worker.js?instance=${crypto.randomUUID()}`);
   await load();
-  async function message(type, data = {}) {
+  async function message(type, data = {}, sender = { url: api.runtime.getURL("control.html") }) {
     return new Promise(resolve => {
       const fn = api.runtime.onMessage.listeners.at(-1);
-      fn({ channel: CHANNEL, target: "worker", type, ...data }, { id: "test-id", url: api.runtime.getURL("control.html") }, resolve);
+      const handled = fn({ channel: CHANNEL, target: "worker", type, ...data }, { id: "test-id", ...sender }, resolve);
+      if (!handled) resolve(undefined);
     });
   }
   return { api, local, session, tab, viewers, removed, load, message, captures: () => captures, starts: () => starts, closes: () => closes, setCaptureStatus: value => { captureStatus = value; } };
@@ -125,6 +127,27 @@ test("A/V viewer becomes visible after capture authorization but before waiting 
     await pending;
     await f.message("STOP");
   }
+});
+
+test("only the current viewer can adjust the shared settings, including rapid relative steps", async () => {
+  const f = await fixture();
+  const { state } = await f.message("START", { tabId: 8, mode: "av" });
+  const sender = { url: f.viewers.get(9).url, tab: { id: 9 } };
+  const send = (type, data) => f.message(type, { sessionId: state.sessionId, ...data }, sender);
+  await f.load();
+  await Promise.all([send("DELAY", { step: 0.1 }), send("DELAY", { step: 0.1 }), send("DELAY", { step: -0.5 })]);
+  assert.equal(f.local.delay, 29.7);
+  assert.equal((await send("DELAY", { delay: 60 })).state.delay, 60);
+  assert.equal((await send("DELAY", { step: 0.5 })).state.delay, 60);
+  assert.equal((await send("QUALITY", { quality: "1080p60" })).state.sessionId, state.sessionId);
+  assert.deepEqual(f.local.videoOptions, { region: "player", quality: "1080p60" });
+  assert.equal(f.captures(), 1);
+  assert.equal((await f.message("DELAY", { sessionId: state.sessionId, delay: 1 }, { ...sender, tab: { id: 10 } })).ok, false);
+  assert.equal(await send("STOP", {}), undefined);
+  await f.message("STOP");
+  await f.message("START", { tabId: 8, mode: "av" });
+  assert.equal((await send("DELAY", { step: -0.1 })).ok, false);
+  assert.equal(f.local.delay, 60);
 });
 
 test("late stopped event does not end a new active capture; real closure releases document", async () => {

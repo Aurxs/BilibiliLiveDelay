@@ -1,6 +1,6 @@
 import { VIDEO_RATE, initSegment, mediaSegment } from "./fragmented-mp4.js";
 import { measureAacPriming } from "./aac-priming.js";
-import { cropPixels, outputSize } from "./video-options.js";
+import { cropPixels, outputSize, encoderConfig, videoMime } from "./video-options.js";
 
 // Audio samples are the master clock. Anchor each processor's possibly
 // unrelated timestamp origin once. Map video capture times to the audio sample
@@ -42,6 +42,7 @@ export class AVEncoder {
     this.audioSamples = 0;
     this.keyTime = -Infinity;
     this.videoTime = -1;
+    this.needsVideoInit = true;
   }
 
   async start(videoTrack, audioTrack, rate, channels) {
@@ -101,13 +102,20 @@ export class AVEncoder {
     const time = captureTime + this.videoLead;
     if (time <= this.videoTime) return;
     const rect = this.geometry ? cropPixels(frame, this.geometry) : frame.visibleRect;
-    if (!this.size) {
-      this.size = outputSize(rect, this.preset, this.geometry && this.geometry.sourceWidth / this.geometry.sourceHeight);
-      const config = { ...this.size, codec: "avc1.4200" + this.preset.level, avc: { format: "avc" },
-        bitrate: this.preset.bitrate, framerate: this.preset.fps, latencyMode: "realtime" };
+    const preset = this.preset;
+    if (this.encodingPreset !== preset) {
+      const size = outputSize(rect, preset, this.geometry && this.geometry.sourceWidth / this.geometry.sourceHeight);
+      const config = encoderConfig(preset, size);
       if (!(await VideoEncoder.isConfigSupported(config)).supported) throw new Error("此浏览器不支持所选画质的 WebCodecs H.264 编码。");
+      // Deliver old callbacks before associating output with the new format.
+      if (!this.closed && this.encodingPreset) await this.video.flush();
       if (this.closed) return;
       this.video.configure(config);
+      this.encodingPreset = preset;
+      this.size = size;
+      this.keyTime = -Infinity;
+      this.formatKey = null;
+      this.needsVideoInit = true;
     }
     const formatKey = [rect.width, rect.height, frame.codedWidth, frame.codedHeight].join("/");
     if (this.formatKey !== formatKey) {
@@ -123,14 +131,23 @@ export class AVEncoder {
   }
 
   output(type, chunk, metadata) {
+    const video = type === "video";
+    let format;
     const description = metadata?.decoderConfig?.description;
     if (description) {
       const data = new Uint8Array(description);
       const old = this.descriptions[type];
-      if (old && (old.length !== data.length || old.some((v, i) => v !== data[i]))) throw new Error("编码格式已改变，请重新启动。");
+      if (old && (old.length !== data.length || old.some((v, i) => v !== data[i]))) {
+        if (!video) throw new Error("音频编码格式已改变，请重新启动。");
+        this.needsVideoInit = true;
+      }
       this.descriptions[type] = data;
     }
-    const video = type === "video";
+    if (video && this.needsVideoInit) {
+      if (chunk.type !== "key" || !this.descriptions.video) throw new Error("新画质缺少可解码的起始帧。");
+      format = { ...this.size, description: this.descriptions.video, mime: videoMime(this.encodingPreset || this.preset) };
+      this.needsVideoInit = false;
+    }
     // AAC-LC access units contain 1024 samples. Rounding a duration in
     // microseconds once per packet would accumulate error over a race.
     const time = video ? chunk.timestamp : this.audioSamples;
@@ -145,28 +162,27 @@ export class AVEncoder {
     if (this.bytes > this.maxBytes || queue.length >= 800) throw new Error("等待音画编码数据超时或积压过多，请重新启动。");
     const data = new Uint8Array(chunk.byteLength);
     chunk.copyTo(data);
-    queue.push({ data, time, key: !video || chunk.type === "key", duration: video ? 0 : 1024 });
+    queue.push({ data, time, key: !video || chunk.type === "key", duration: video ? 0 : 1024, format });
     this.pump();
   }
 
   pump() {
     const { video, audio } = this.samples;
-    if (!this.sequence) {
-      if (!this.descriptions.video || !this.descriptions.audio) return;
-      this.onBytes(initSegment(this.size.width, this.size.height, this.descriptions.video, this.descriptions.audio, this.rate, this.channels));
-      this.sequence = 1;
-    }
+    if (!this.descriptions.audio) return;
     // Keep the first frame of the next fragment for the exact duration of the
     // last video frame. A fragment may start with a delta frame within a GOP.
-    const split = video.findIndex(s => s.time - video[0].time >= VIDEO_RATE / 4);
+    const split = video.findIndex((s, i) => i > 0 && (s.format || s.time - video[0].time >= VIDEO_RATE / 4));
     if (split < 1 || !audio.length) return;
     const boundary = video[split].time * this.rate / VIDEO_RATE;
     const cut = audio.findIndex(s => s.time >= boundary);
-    if (cut < 1) return;
+    if (cut < 0) return;
+    // Very short intervals between switches may contain no AAC packet.
     const pictures = video.splice(0, split), sounds = audio.splice(0, cut);
     for (const s of pictures) this.bytes -= s.data.length;
     for (const s of sounds) this.bytes -= s.data.length;
-    this.onBytes(mediaSegment(this.sequence++, pictures, sounds));
+    const format = pictures[0].format;
+    if (format) this.onBytes(initSegment(format.width, format.height, format.description, this.descriptions.audio, this.rate, this.channels), format.mime);
+    this.onBytes(mediaSegment(++this.sequence, pictures, sounds));
   }
 
   async close() {

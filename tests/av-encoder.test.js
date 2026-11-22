@@ -54,7 +54,7 @@ test('audio sample clock aligns video through three hours of oscillator skew and
 
 test('sample queues release bytes as complete fragments are sent, and never accumulate a missing track', () => {
   const output = [];
-  const encoder = new AVEncoder({ maxBytes: 4096, onBytes: b => output.push(Buffer.from(b)) });
+  const encoder = new AVEncoder({ preset: VIDEO_PRESETS['720p30'], maxBytes: 4096, onBytes: b => output.push(Buffer.from(b)) });
   Object.assign(encoder, { size: { width: 640, height: 360 }, rate: 48000, channels: 2 });
   const chunk = (timestamp, type) => ({ timestamp, type, byteLength: 8, copyTo: buf => buf.fill(1) });
   for (let i = 0; i < 100; i++) {
@@ -87,4 +87,51 @@ test('crop uses the source frame timestamp and visible rectangle, scales in the 
     assert.equal(input.options.timestamp, 200000); assert.equal(closed, 1); assert.ok(key);
     assert.equal(config.width,1280); assert.equal(config.height,720);
   } finally { globalThis.VideoFrame = originalFrame; globalThis.VideoEncoder = originalEncoder; }
+});
+
+test('quality changes split fragments on keyframes and keep both track timelines continuous', () => {
+  const packets = [];
+  const encoder = new AVEncoder({ preset: VIDEO_PRESETS['720p30'], maxBytes: 4096,
+    onBytes: (bytes, mime) => packets.push({ bytes: Buffer.from(bytes), mime }) });
+  Object.assign(encoder, { size: { width: 1280, height: 720 }, rate: 48000, channels: 2 });
+  const chunk = (timestamp, key) => ({ timestamp, type: key ? 'key' : 'delta', byteLength: 1, copyTo: b => b.fill(1) });
+  const config = id => ({ decoderConfig: { description: Uint8Array.of(id) } });
+  // Video runs ahead of audio. Two transitions are already queued when the
+  // muxer gets its first chance to write out the original format.
+  for (let i = 0; i < 60; i++) {
+    const change = i === 7 || i === 8;
+    if (change) {
+      encoder.encodingPreset = VIDEO_PRESETS[i === 7 ? '1080p60' : '720p30'];
+      encoder.size = { width: encoder.encodingPreset.width, height: encoder.encodingPreset.height };
+      encoder.needsVideoInit = true;
+    }
+    encoder.output('video', chunk(i * 16000, !i || change), !i || change ? config(i + 1) : {});
+  }
+  for (let i = 0; i < 50; i++) encoder.output('audio', chunk(0, true), i ? {} : config(42));
+  const formats = [], firstVideoTimes = [];
+  const nextTime = [0, 0];
+  let expectKey = false;
+  for (const { bytes, mime } of packets) {
+    if (mime) {
+      formats.push(mime);
+      expectKey = true;
+      continue;
+    }
+    const [, ...tracks] = children(bytes, boxes(bytes)[0]);
+    for (const [index, track] of tracks.entries()) {
+      const [, tfdt, trun] = children(bytes, track);
+      const start = Number(bytes.readBigUInt64BE(tfdt.pos + 12));
+      assert.equal(start, nextTime[index]);
+      if (index === 0 && expectKey) {
+        firstVideoTimes.push(start);
+        assert.equal(bytes.readUInt32BE(trun.pos + 28), 0x02000000);
+        expectKey = false;
+      }
+      const count = bytes.readUInt32BE(trun.pos + 12);
+      for (let i = 0; i < count; i++) nextTime[index] += bytes.readUInt32BE(trun.pos + 20 + i * 12);
+    }
+  }
+  assert.deepEqual(firstVideoTimes, [0, 112000, 128000]);
+  assert.deepEqual(formats.map(mime => mime.includes('42002a')), [false, true, false]);
+  assert.ok(nextTime[0] > 500000 && nextTime[1] > 24000);
 });

@@ -35,6 +35,7 @@ export class AVPlayback {
         clearTimeout(timer);
         try {
           this.buffer = this.mediaSource.addSourceBuffer(mime);
+          this.mime = mime;
           this.buffer.addEventListener("updateend", () => { this.pump(); this.tick(); });
           this.buffer.addEventListener("error", () => this.fail("媒体缓冲解析失败，请重新启动。"));
           this.timer = setInterval(() => this.tick(), 250);
@@ -47,10 +48,10 @@ export class AVPlayback {
       this.video.load();
     });
   }
-  append(bytes, sequence) {
+  append(bytes, sequence, mime) {
     if (this.closed) return;
     if (sequence !== this.sequence++) { this.fail("音画数据不连续，已停止播放，请重新启动。"); return; }
-    this.queue.push(bytes);
+    this.queue.push({ bytes, mime });
     this.queuedBytes += bytes.byteLength;
     if (this.queuedBytes > this.maxQueuedBytes) { this.fail("播放缓冲积压过多，请重新启动或选择较低画质。"); return; }
     this.pump();
@@ -75,7 +76,13 @@ export class AVPlayback {
         this.removedThrough = removeBefore;
         this.buffer.remove(0, removeBefore);
       } else if (this.queue.length) {
-        const bytes = this.queue[0];
+        const { bytes, mime } = this.queue[0];
+        // Switch parsers at the corresponding init segment, after all older
+        // appends finish. Already buffered frames stay on the same timeline.
+        if (mime && mime !== this.mime) {
+          this.buffer.changeType(mime);
+          this.mime = mime;
+        }
         try {
           this.buffer.appendBuffer(bytes);
           this.queue.shift();
@@ -100,6 +107,8 @@ export class AVPlayback {
     const next = normalizeDelay(value);
     if (next === this.delay) return;
     const previous = this.delay;
+    clearTimeout(this.resumeTimer);
+    this.resumeTimer = null;
     this.delay = next;
     if (this.started) {
       this.video.pause();
@@ -131,7 +140,14 @@ export class AVPlayback {
       this.started = true;
     }
     if (this.started) {
-      if (this.adjusting && remaining <= 0.06) this.adjusting = false;
+      if (this.adjusting && remaining <= 0.005) this.adjusting = false;
+      // Sub-second steps need a deadline between the regular 250 ms ticks.
+      if (this.adjusting && !this.resumeTimer && this.origin !== undefined) {
+        this.resumeTimer = setTimeout(() => {
+          this.resumeTimer = null;
+          this.tick();
+        }, Math.ceil(remaining * 1000));
+      }
       if (!this.adjusting) {
         // No speed changes. Recover from stalls/background suspension by one
         // bounded seek in our player, keeping audio and video on the same clock.
@@ -157,6 +173,7 @@ export class AVPlayback {
     if (this.closed) return;
     this.closed = true;
     clearInterval(this.timer);
+    clearTimeout(this.resumeTimer);
     this.video.removeEventListener("error", this.errorHandler);
     this.video.pause();
     this.video.removeAttribute("src");

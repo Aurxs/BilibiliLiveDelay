@@ -17,6 +17,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || message?.channel !== CHANNEL || message.target !== "offscreen") return;
   let operation;
   try {
+    if (["DELAY", "QUALITY"].includes(message.type) && message.sessionId &&
+        (engine !== avEngine || !engine.session || engine.state.sessionId !== message.sessionId)) throw new Error("播放已结束。");
     switch (message.type) {
       case "STATE": operation = engine.snapshot(); break;
       case "CLEANUP": operation = engine.cleanupPromise || Promise.resolve(); break;
@@ -25,6 +27,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         operation = engine.start(message.data); break;
       case "STOP": operation = engine.stop(message.reason); break;
       case "DELAY": operation = engine.setDelay(message.delay); break;
+      case "QUALITY": operation = avEngine.setQuality(message.quality); break;
       case "REGION": operation = engine instanceof AVEngine ? engine.setRegion(message) : engine.snapshot(); break;
       case "INTERRUPT": operation = engine.fail(engine.session, "interrupted", message.reason); break;
       default: return;

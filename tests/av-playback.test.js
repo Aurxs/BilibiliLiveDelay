@@ -71,6 +71,25 @@ test('A/V decrease cancels wait and seeks only the extension output, including z
   f.player.close();
 });
 
+test('a tenth-second increase resumes from the deadline between playback ticks', t => {
+  const f = fixture();
+  let now = 40, resume, wait;
+  f.player.origin = 0;
+  f.player.liveTime = () => now;
+  t.mock.method(globalThis, 'setTimeout', (callback, ms) => {
+    resume = callback; wait = ms;
+    return 1;
+  });
+  f.player.setDelay(30.1);
+  assert.equal(f.video.paused, true);
+  assert.ok(wait >= 99 && wait <= 101);
+  now += 0.1;
+  resume();
+  assert.equal(f.video.paused, false);
+  assert.equal(f.video.currentTime, 9.25);
+  f.player.close();
+});
+
 test('old buffered data is trimmed; sequence gaps fail closed and silence output', () => {
   const f = fixture();
   f.head(160); f.video.currentTime = 129.25;
@@ -80,6 +99,26 @@ test('old buffered data is trimmed; sequence gaps fail closed and silence output
   assert.match(f.error(), /不连续/);
   assert.equal(f.player.closed, true);
   assert.equal(f.video.paused, true);
+});
+
+test('a new MIME is applied in append order while buffered video keeps playing', () => {
+  const { player, video, head } = fixture();
+  head(35);
+  const calls = [];
+  const buffer = player.buffer;
+  buffer.appendBuffer = bytes => { calls.push(bytes[0]); buffer.updating = true; };
+  buffer.changeType = mime => calls.push(mime);
+  player.mime = 'old';
+  buffer.updating = true;
+  player.append(Uint8Array.of(1), 0);
+  player.append(Uint8Array.of(2), 1, 'new');
+  player.append(Uint8Array.of(3), 2);
+  assert.deepEqual(calls, []);
+  for (let i = 0; i < 3; i++) { buffer.updating = false; player.pump(); }
+  assert.deepEqual(calls, [1, 'new', 2, 3]);
+  assert.equal(video.paused, false);
+  assert.equal(video.currentTime, 9.25);
+  player.close();
 });
 
 test('adjustments use the live clock even when encoded chunks arrive late', () => {
@@ -112,7 +151,7 @@ test('high bitrate fragments retain bounded queues; quota recovery retries the s
   };
   f.player.pump();
   assert.deepEqual(f.removed(), [0, 18.5]);
-  assert.equal(f.player.queue[0], bytes);
+  assert.equal(f.player.queue[0].bytes, bytes);
   f.player.pump();
   assert.equal(f.player.queue.length, 0);
   assert.equal(f.player.queuedBytes, 0);
