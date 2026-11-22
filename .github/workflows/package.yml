@@ -64,4 +64,7 @@ jobs:
             fi
           fi
           gh release upload "$tag" dist/*.crx dist/*.zip dist/SHA256SUMS --clobber
-          gh release edit "$tag" --draft=false
+          notes="$RUNNER_TEMP/publish-notes.md"
+          gh release view "$tag" --json body --jq .body |
+            node scripts/release-notes.js "$GITHUB_REPOSITORY" "$tag" > "$notes"
+          gh release edit "$tag" --notes-file "$notes" --draft=false
