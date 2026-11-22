@@ -14,7 +14,7 @@
 [![Manifest](https://img.shields.io/badge/Manifest-V3-6b5bd2)](manifest.json)
 [![License](https://img.shields.io/badge/license-MIT-27a46a)](LICENSE)
 
-**[直接下载最新整合包 →](https://download.aurxs.dev/BilibiliLiveDelay.zip)** · [所有 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases)
+**[从 Edge 扩展商店安装](https://microsoftedge.microsoft.com/addons/detail/ijgpaikhpfjjmiimfocfnjbamigokgih)** · **[下载最新整合包](https://download.aurxs.dev/BilibiliLiveDelay.zip)** · [所有 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases)
 
 [快速安装](#quick-start) · [功能](#features) · [工作原理](#how-it-works) · [测试记录](TESTING.md) · [反馈问题](https://github.com/Aurxs/BilibiliLiveDelay/issues)
 
@@ -59,11 +59,15 @@
 
 想确认自己的浏览器能否使用？打开[浏览器兼容性自测](https://aurxs.github.io/BilibiliLiveDelay/)。打开即可看到当前浏览器的音视频检测结果，以及按版本估算的 Manifest V3、`tabCapture` 和 `offscreen` 支持情况。推荐使用最新版桌面 [Google Chrome](https://www.google.cn/chrome/)。
 
-### 1. 下载并解压扩展 ZIP（推荐）
+### Edge：从扩展商店安装（推荐）
 
-**Chrome 和 Edge 用户建议使用 ZIP 安装。** 从 [GitHub 最新 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest) 的附件中下载扩展 ZIP，解压到一个打算长期保留的文件夹。也可以[下载最新整合包](https://download.aurxs.dev/BilibiliLiveDelay.zip)：先解压整合包，再解压里面的扩展 ZIP。下一步要选择的是能直接看到 `manifest.json` 的文件夹。
+用桌面版 Edge 打开 [Live Audio Sync 商店页面](https://microsoftedge.microsoft.com/addons/detail/ijgpaikhpfjjmiimfocfnjbamigokgih)，点击「获取」并确认添加扩展，无需开启开发者模式。
 
-### 2. 加载到浏览器
+### Chrome：下载并解压扩展 ZIP
+
+从 [GitHub 最新 Release](https://github.com/Aurxs/BilibiliLiveDelay/releases/latest) 的附件中下载扩展 ZIP，解压到一个打算长期保留的文件夹。也可以[下载最新整合包](https://download.aurxs.dev/BilibiliLiveDelay.zip)：先解压整合包，再解压里面的扩展 ZIP。下一步要选择的是能直接看到 `manifest.json` 的文件夹。
+
+#### 加载已解压的扩展
 
 1. 在 **Chrome 116+** 打开 `chrome://extensions`，或在桌面版 **Edge** 打开 `edge://extensions`。
 2. 开启「开发者模式」。
